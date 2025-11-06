@@ -2,14 +2,42 @@ import json
 import os
 import boto3
 import urllib3
+from datetime import datetime
 from context_gatherer import ContextGatherer
 
 http = urllib3.PoolManager()
 ssm = boto3.client('ssm')
 sqs = boto3.client('sqs')
+dynamodb = boto3.resource('dynamodb')
 
 # Initialize context gatherer
 context_gatherer = ContextGatherer()
+
+def save_alert_to_dynamodb(alert_data, analysis):
+    """Save alert and analysis to DynamoDB"""
+    try:
+        table_name = os.environ.get('ALERTS_TABLE')
+        table = dynamodb.Table(table_name)
+
+        item = {
+            'alert_id': alert_data.get('alert_id'),
+            'timestamp': alert_data.get('timestamp', int(datetime.now().timestamp() * 1000)),
+            'severity': alert_data.get('severity', 'UNKNOWN'),
+            'source': alert_data.get('source', 'unknown'),
+            'alert': alert_data.get('message', ''),
+            'analysis': analysis,
+            'log_group': alert_data.get('log_group', ''),
+            'log_stream': alert_data.get('log_stream', ''),
+            'infrastructure_context': alert_data.get('infrastructure_context', {}),
+            'model': 'gemini-2.5-flash'
+        }
+
+        table.put_item(Item=item)
+        print(f"✅ Saved alert {alert_data.get('alert_id')} to DynamoDB")
+        return True
+    except Exception as e:
+        print(f"❌ Error saving to DynamoDB: {e}")
+        return False
 
 def lambda_handler(event, context):
     """
@@ -111,6 +139,9 @@ Format the response clearly with headers and bullet points."""
             analysis = "No analysis returned from Gemini"
 
         print(f"Analysis: {analysis[:500]}...")  # Log first 500 chars
+
+        # Save to DynamoDB
+        save_alert_to_dynamodb(body, analysis)
 
         # Send analysis to distribution queue with enhanced data
         distribution_message = {
