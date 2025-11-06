@@ -198,3 +198,14 @@ output "check_queue_depth" {
   description = "Command to check processing queue depth"
   value       = "aws sqs get-queue-attributes --queue-url ${module.sqs_processing.queue_url} --attribute-names ApproximateNumberOfMessagesVisible"
 }
+
+# Slack Interactions API Gateway
+output "slack_interactions_url" {
+  description = "URL for Slack Interactions webhook (configure this in Slack App settings)"
+  value       = "${aws_apigatewayv2_api.slack_interactions.api_endpoint}/${var.environment}/slack/interactions"
+}
+
+output "jira_queue_url" {
+  description = "Jira processing queue URL (if Jira is enabled)"
+  value       = var.jira_enabled ? module.sqs_jira[0].queue_url : "Jira not enabled"
+}

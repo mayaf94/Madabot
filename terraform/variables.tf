@@ -85,6 +85,18 @@ variable "jira_project_key" {
   default     = ""
 }
 
+variable "jira_issue_type" {
+  description = "Jira issue type for created tickets (e.g., Task, Bug, Incident)"
+  type        = string
+  default     = "Task"
+}
+
+variable "slack_signing_secret_name" {
+  description = "AWS Secrets Manager secret name for Slack signing secret (for verifying interactions)"
+  type        = string
+  default     = "slack-signing-secret"
+}
+
 variable "email_enabled" {
   description = "Enable email notifications via SES"
   type        = bool

@@ -158,6 +158,24 @@ module "sqs_distribution" {
   tags = local.common_tags
 }
 
+# Jira Processing Queue (only created if Jira is enabled)
+module "sqs_jira" {
+  count  = var.jira_enabled ? 1 : 0
+  source = "./modules/sqs"
+
+  queue_name                  = "${local.name_prefix}-jira-queue.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = true
+  visibility_timeout_seconds  = 300
+
+  enable_dlq           = true
+  dlq_name             = "${local.name_prefix}-jira-dlq.fifo"
+  max_receive_count    = 3
+  dlq_retention_period = var.dlq_retention_period
+
+  tags = local.common_tags
+}
+
 # IAM Roles for Lambda Functions
 module "iam_ingestor" {
   source = "./modules/iam"
@@ -339,7 +357,18 @@ module "iam_notifier" {
               "sqs:DeleteMessage",
               "sqs:GetQueueAttributes"
             ]
-            Resource = module.sqs_distribution.queue_arn
+            Resource = concat(
+              [module.sqs_distribution.queue_arn],
+              var.jira_enabled ? [module.sqs_jira[0].queue_arn] : []
+            )
+          },
+          {
+            Effect = "Allow"
+            Action = [
+              "sqs:SendMessage"
+            ]
+            Resource = var.jira_enabled ? module.sqs_jira[0].queue_arn : ""
+            Condition = var.jira_enabled ? {} : null
           },
           {
             Effect = "Allow"
@@ -357,6 +386,16 @@ module "iam_notifier" {
             Resource = [
               data.aws_secretsmanager_secret.slack_bot_token.arn
             ]
+          },
+          {
+            Effect = "Allow"
+            Action = [
+              "ssm:GetParameter",
+              "ssm:GetParameters"
+            ]
+            Resource = var.jira_enabled ? [
+              aws_ssm_parameter.jira_api_token[0].arn
+            ] : []
           },
           {
             Effect = "Allow"
@@ -465,6 +504,61 @@ module "lambda_slack_notifier" {
   tags = local.common_tags
 }
 
+# Jira Notifier Lambda (only created if Jira is enabled)
+module "lambda_jira_notifier" {
+  count  = var.jira_enabled ? 1 : 0
+  source = "./modules/lambda"
+
+  function_name = "${local.name_prefix}-jira-notifier"
+  description   = "Creates Jira tickets for alerts"
+  handler       = "handler.lambda_handler"
+  runtime       = var.lambda_runtime
+
+  source_dir = "${local.lambda_source_dir}/jira_notifier"
+
+  role_arn = module.iam_notifier.role_arn
+
+  memory_size = var.notifier_memory_size
+  timeout     = var.notifier_timeout
+
+  environment_variables = {
+    ENVIRONMENT         = var.environment
+    ALERTS_TABLE        = module.dynamodb_alerts.table_name
+    JIRA_URL            = var.jira_url
+    JIRA_PROJECT_KEY    = var.jira_project_key
+    JIRA_ISSUE_TYPE     = var.jira_issue_type
+    JIRA_API_TOKEN_PARAM = var.jira_enabled ? aws_ssm_parameter.jira_api_token[0].name : ""
+  }
+
+  tags = local.common_tags
+}
+
+# Slack Interactions Handler Lambda (handles button clicks)
+module "lambda_slack_interactions" {
+  source = "./modules/lambda"
+
+  function_name = "${local.name_prefix}-slack-interactions"
+  description   = "Handles Slack interactive button clicks"
+  handler       = "handler.lambda_handler"
+  runtime       = var.lambda_runtime
+
+  source_dir = "${local.lambda_source_dir}/slack_interactions"
+
+  role_arn = module.iam_notifier.role_arn
+
+  memory_size = 512
+  timeout     = 30
+
+  environment_variables = {
+    ENVIRONMENT           = var.environment
+    ALERTS_TABLE          = module.dynamodb_alerts.table_name
+    JIRA_QUEUE_URL        = var.jira_enabled ? module.sqs_jira[0].queue_url : ""
+    SLACK_SIGNING_SECRET  = var.slack_signing_secret_name
+  }
+
+  tags = local.common_tags
+}
+
 # Lambda Event Source Mappings
 resource "aws_lambda_event_source_mapping" "analyzer_sqs" {
   event_source_arn = module.sqs_processing.queue_arn
@@ -480,6 +574,14 @@ resource "aws_lambda_event_source_mapping" "analyzer_sqs" {
 resource "aws_lambda_event_source_mapping" "notifier_sqs" {
   event_source_arn = module.sqs_distribution.queue_arn
   function_name    = module.lambda_slack_notifier.function_arn
+  batch_size       = 1
+  enabled          = true
+}
+
+resource "aws_lambda_event_source_mapping" "jira_notifier_sqs" {
+  count            = var.jira_enabled ? 1 : 0
+  event_source_arn = module.sqs_jira[0].queue_arn
+  function_name    = module.lambda_jira_notifier[0].function_arn
   batch_size       = 1
   enabled          = true
 }
@@ -574,4 +676,43 @@ resource "aws_cloudwatch_metric_alarm" "analyzer_errors" {
   }
 
   tags = local.common_tags
+}
+
+# API Gateway for Slack Interactions
+resource "aws_apigatewayv2_api" "slack_interactions" {
+  name          = "${local.name_prefix}-slack-interactions"
+  protocol_type = "HTTP"
+  description   = "API Gateway for handling Slack interactive button clicks"
+
+  tags = local.common_tags
+}
+
+resource "aws_apigatewayv2_stage" "slack_interactions" {
+  api_id      = aws_apigatewayv2_api.slack_interactions.id
+  name        = var.environment
+  auto_deploy = true
+
+  tags = local.common_tags
+}
+
+resource "aws_apigatewayv2_integration" "slack_interactions" {
+  api_id                 = aws_apigatewayv2_api.slack_interactions.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = module.lambda_slack_interactions.function_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "slack_interactions" {
+  api_id    = aws_apigatewayv2_api.slack_interactions.id
+  route_key = "POST /slack/interactions"
+  target    = "integrations/${aws_apigatewayv2_integration.slack_interactions.id}"
+}
+
+resource "aws_lambda_permission" "api_gateway" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda_slack_interactions.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.slack_interactions.execution_arn}/*/*"
 }
