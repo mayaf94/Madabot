@@ -259,6 +259,54 @@ module "iam_analyzer" {
               var.ai_provider == "anthropic" ? [aws_ssm_parameter.anthropic_api_key[0].arn] : [],
               var.ai_provider == "google" ? [aws_ssm_parameter.google_api_key[0].arn] : []
             )
+          },
+          {
+            Effect   = "Allow"
+            Action   = [
+              "ec2:DescribeInstanceStatus",
+              "ec2:DescribeInstances",
+              "ec2:DescribeTags"
+            ]
+            Resource = "*"
+          },
+          {
+            Effect   = "Allow"
+            Action   = [
+              "ecs:ListClusters",
+              "ecs:DescribeTasks",
+              "ecs:DescribeContainerInstances",
+              "ecs:DescribeServices"
+            ]
+            Resource = "*"
+          },
+          {
+            Effect   = "Allow"
+            Action   = [
+              "elasticloadbalancing:DescribeLoadBalancers",
+              "elasticloadbalancing:DescribeTargetGroups",
+              "elasticloadbalancing:DescribeTargetHealth",
+              "elasticloadbalancing:DescribeListeners"
+            ]
+            Resource = "*"
+          },
+          {
+            Effect   = "Allow"
+            Action   = [
+              "cloudformation:ListStacks",
+              "cloudformation:DescribeStacks",
+              "cloudformation:DescribeStackEvents",
+              "cloudformation:DescribeStackResources"
+            ]
+            Resource = "*"
+          },
+          {
+            Effect   = "Allow"
+            Action   = [
+              "cloudwatch:GetMetricStatistics",
+              "cloudwatch:GetMetricData",
+              "cloudwatch:ListMetrics"
+            ]
+            Resource = "*"
           }
         ]
       })

@@ -2,14 +2,18 @@ import json
 import os
 import boto3
 import urllib3
+from context_gatherer import ContextGatherer
 
 http = urllib3.PoolManager()
 ssm = boto3.client('ssm')
 sqs = boto3.client('sqs')
 
+# Initialize context gatherer
+context_gatherer = ContextGatherer()
+
 def lambda_handler(event, context):
     """
-    Basic analyzer Lambda to test Gemini API integration
+    Enhanced analyzer Lambda with infrastructure context gathering
     """
     print(f"Received event: {json.dumps(event)}")
 
@@ -26,15 +30,56 @@ def lambda_handler(event, context):
         body = json.loads(record['body'])
         alert_message = body.get('message', 'Unknown error')
 
-        # Create simple prompt
-        prompt = f"""Analyze this alert and provide a brief diagnosis:
+        print(f"Processing alert: {body.get('alert_id')}")
 
-Alert: {alert_message}
+        # Gather infrastructure context
+        print("Gathering infrastructure context...")
+        try:
+            infra_context = context_gatherer.gather_all_context(body)
+            context_text = context_gatherer.format_context_for_prompt(infra_context)
+            print(f"Context gathered successfully. Length: {len(context_text)} chars")
+        except Exception as e:
+            print(f"Error gathering context: {e}")
+            context_text = "Context gathering failed - analyzing with limited information"
+            infra_context = {}
 
-Provide:
-1. Severity (CRITICAL/HIGH/MEDIUM/LOW)
-2. Likely cause
-3. One recommended action"""
+        # Create enhanced prompt with context
+        prompt = f"""You are an expert SRE analyzing a production alert. Analyze this alert with the provided infrastructure context and provide actionable insights.
+
+## Alert
+{alert_message}
+
+{context_text}
+
+## Analysis Required
+Provide a structured analysis with:
+
+1. **Severity Assessment** (CRITICAL/HIGH/MEDIUM/LOW)
+   - Validate or adjust the severity based on context
+   - Consider impact on users and systems
+
+2. **Root Cause Analysis**
+   - What is the most likely root cause?
+   - Use infrastructure context to identify specific issues
+   - Reference specific resources (Pod names, Task IDs, etc.)
+
+3. **Impact Assessment**
+   - Which systems/users are affected?
+   - Is this a partial or total outage?
+
+4. **Recommended Actions** (prioritized list)
+   - Immediate mitigation steps
+   - Investigation steps
+   - Long-term fixes
+
+5. **Monitoring Recommendations**
+   - What metrics should be watched?
+   - What would indicate the issue is resolved?
+
+6. **Confidence Score** (0.0-1.0)
+   - How confident are you in this analysis?
+
+Format the response clearly with headers and bullet points."""
 
         # Call Gemini REST API
         url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}'
@@ -65,16 +110,24 @@ Provide:
         else:
             analysis = "No analysis returned from Gemini"
 
-        print(f"Analysis: {analysis}")
+        print(f"Analysis: {analysis[:500]}...")  # Log first 500 chars
 
-        # Send analysis to distribution queue
+        # Send analysis to distribution queue with enhanced data
         distribution_message = {
             'alert_id': body.get('alert_id'),
             'alert': alert_message,
             'analysis': analysis,
             'severity': body.get('severity', 'UNKNOWN'),
             'source': body.get('source', 'unknown'),
-            'model': 'gemini-2.5-flash'
+            'model': 'gemini-2.5-flash',
+            'log_group': body.get('log_group', ''),
+            'log_stream': body.get('log_stream', ''),
+            'infrastructure_context': {
+                'type': infra_context.get('log_context', {}).get('infrastructure_type', 'unknown'),
+                'resource_id': infra_context.get('log_context', {}).get('resource_id', ''),
+                'pod_name': infra_context.get('log_context', {}).get('pod_name', ''),
+                'task_id': infra_context.get('log_context', {}).get('task_id', ''),
+            }
         }
 
         sqs.send_message(
@@ -83,14 +136,15 @@ Provide:
             MessageGroupId='analysis'
         )
 
-        print(f"Sent analysis to distribution queue: {distribution_queue_url}")
+        print(f"Sent enhanced analysis to distribution queue: {distribution_queue_url}")
 
         return {
             'statusCode': 200,
             'body': json.dumps({
                 'alert': alert_message,
                 'analysis': analysis,
-                'model': 'gemini-2.5-flash'
+                'model': 'gemini-2.5-flash',
+                'context_gathered': len(context_text) > 0
             })
         }
 
