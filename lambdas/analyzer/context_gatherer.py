@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import boto3
 from botocore.exceptions import ClientError
+from code_fetcher import CodeFetcher
 
 
 class ContextGatherer:
@@ -21,6 +22,7 @@ class ContextGatherer:
         self.cloudformation = boto3.client('cloudformation')
         self.cloudwatch = boto3.client('cloudwatch')
         self.logs = boto3.client('logs')
+        self.code_fetcher = CodeFetcher()
 
     def gather_all_context(self, alert: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -38,7 +40,8 @@ class ContextGatherer:
             'load_balancers': {},
             'recent_changes': {},
             'metrics': {},
-            'resource_tags': {}
+            'resource_tags': {},
+            'code_context': {}
         }
 
         # Extract log context (Pod/Node names, container IDs, etc.)
@@ -87,6 +90,16 @@ class ContextGatherer:
         # Get resource tags for context
         if resource_id:
             context['resource_tags'] = self.get_resource_tags(resource_id, infra_type)
+
+        # Get code context (POC: for test app)
+        try:
+            code_context = self.code_fetcher.get_code_context(alert)
+            if code_context:
+                context['code_context'] = code_context
+                print(f"✅ Code context gathered for {alert.get('log_group', 'unknown')}")
+        except Exception as e:
+            print(f"⚠️ Error gathering code context: {e}")
+            # Graceful degradation - continue without code context
 
         return context
 
@@ -598,5 +611,11 @@ class ContextGatherer:
             sections.append("\n## Resource Tags")
             for key, value in context['resource_tags'].items():
                 sections.append(f"- {key}: {value}")
+
+        # Code Context
+        if context.get('code_context'):
+            code_context_formatted = self.code_fetcher.format_code_context(context['code_context'])
+            if code_context_formatted:
+                sections.append(code_context_formatted)
 
         return "\n".join(sections)

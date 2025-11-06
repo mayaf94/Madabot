@@ -72,7 +72,7 @@ def lambda_handler(event, context):
             infra_context = {}
 
         # Create enhanced prompt with context
-        prompt = f"""You are an expert SRE analyzing a production alert. Analyze this alert with the provided infrastructure context and provide actionable insights.
+        prompt = f"""You are an expert SRE analyzing a production alert. Analyze this alert with the provided infrastructure and code context to provide actionable insights.
 
 ## Alert
 {alert_message}
@@ -85,20 +85,24 @@ Provide a structured analysis with:
 1. **Severity Assessment** (CRITICAL/HIGH/MEDIUM/LOW)
    - Validate or adjust the severity based on context
    - Consider impact on users and systems
+   - If this is a test application generating synthetic errors, note that in your assessment
 
 2. **Root Cause Analysis**
    - What is the most likely root cause?
-   - Use infrastructure context to identify specific issues
+   - Use infrastructure context and code context to identify specific issues
    - Reference specific resources (Pod names, Task IDs, etc.)
+   - If code context is available, reference specific files and functions
 
 3. **Impact Assessment**
    - Which systems/users are affected?
    - Is this a partial or total outage?
+   - Is this a real production issue or a test scenario?
 
 4. **Recommended Actions** (prioritized list)
    - Immediate mitigation steps
    - Investigation steps
    - Long-term fixes
+   - If this is a test app, suggest what real scenarios it's simulating
 
 5. **Monitoring Recommendations**
    - What metrics should be watched?
