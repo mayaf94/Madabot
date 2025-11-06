@@ -3,6 +3,7 @@ import os
 import boto3
 import urllib3
 from urllib.parse import parse_qs
+from decimal import Decimal
 import hmac
 import hashlib
 import time
@@ -11,6 +12,21 @@ http = urllib3.PoolManager()
 sqs = boto3.client('sqs')
 dynamodb = boto3.resource('dynamodb')
 secrets_client = boto3.client('secretsmanager')
+
+# Helper to convert DynamoDB Decimal to JSON-serializable types
+def decimal_to_native(obj):
+    """Convert Decimal types from DynamoDB to native Python types"""
+    if isinstance(obj, list):
+        return [decimal_to_native(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: decimal_to_native(v) for k, v in obj.items()}
+    elif isinstance(obj, Decimal):
+        if obj % 1 == 0:
+            return int(obj)
+        else:
+            return float(obj)
+    else:
+        return obj
 
 def verify_slack_request(event):
     """Verify that the request came from Slack"""
@@ -82,9 +98,12 @@ def send_to_jira_queue(alert_data):
             print("❌ Jira queue URL not configured")
             return False
 
+        # Convert Decimal types to native Python types for JSON serialization
+        clean_data = decimal_to_native(alert_data)
+
         sqs.send_message(
             QueueUrl=jira_queue_url,
-            MessageBody=json.dumps(alert_data),
+            MessageBody=json.dumps(clean_data),
             MessageGroupId='jira-tickets'
         )
 
