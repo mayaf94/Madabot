@@ -177,17 +177,23 @@ def build_slack_blocks(body):
     return blocks
 
 def lambda_handler(event, context):
-    """Enhanced Slack notifier with Block Kit formatting"""
+    """Enhanced Slack notifier with Block Kit formatting using Slack Web API"""
     print(f"Event: {json.dumps(event)}")
 
-    # Get Slack webhook from Secrets Manager
-    secret_name = os.environ['SLACK_WEBHOOK_SECRET']
+    # Get Slack bot token from Secrets Manager
+    secret_name = os.environ.get('SLACK_BOT_TOKEN_SECRET', 'slack-bot-token')
     response = secrets_client.get_secret_value(SecretId=secret_name)
-    secret_string = response['SecretString']
 
-    # Parse JSON secret (format: {"saar_slack_webhook": "https://..."})
-    secret_data = json.loads(secret_string)
-    webhook_url = secret_data['saar_slack_webhook']
+    # Bot token can be stored as plain text or JSON
+    try:
+        secret_data = json.loads(response['SecretString'])
+        bot_token = secret_data.get('bot_token', secret_data.get('slack_bot_token'))
+    except json.JSONDecodeError:
+        # If it's plain text, use it directly
+        bot_token = response['SecretString']
+
+    # Get Slack channel from environment variable
+    slack_channel = os.environ.get('SLACK_CHANNEL', '#alerts')
 
     # Parse message
     for record in event.get('Records', []):
@@ -198,7 +204,9 @@ def lambda_handler(event, context):
         # Build Block Kit message
         blocks = build_slack_blocks(body)
 
+        # Slack Web API message format
         msg = {
+            'channel': slack_channel,
             'attachments': [
                 {
                     'color': get_severity_color(severity),
@@ -207,15 +215,27 @@ def lambda_handler(event, context):
             ]
         }
 
-        print(f"Sending Slack message for alert {body.get('alert_id')}")
+        print(f"Sending Slack message for alert {body.get('alert_id')} to {slack_channel}")
 
+        # Use Slack Web API chat.postMessage
         resp = http.request(
             'POST',
-            webhook_url,
+            'https://slack.com/api/chat.postMessage',
             body=json.dumps(msg),
-            headers={'Content-Type': 'application/json'}
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {bot_token}'
+            }
         )
 
-        print(f"Slack response status: {resp.status}")
+        response_data = json.loads(resp.data.decode('utf-8'))
+        print(f"Slack API response: {json.dumps(response_data)}")
+
+        if not response_data.get('ok'):
+            error = response_data.get('error', 'Unknown error')
+            print(f"❌ Slack API error: {error}")
+            raise Exception(f"Slack API error: {error}")
+        else:
+            print(f"✅ Message sent successfully to {slack_channel}")
 
     return {'statusCode': 200}

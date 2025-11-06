@@ -38,12 +38,12 @@ resource "aws_ssm_parameter" "google_api_key" {
 }
 
 # Reference existing Secrets Manager secret for Slack webhook
-data "aws_secretsmanager_secret" "slack_webhook" {
-  name = "saar-katz-slack-webhook"
+data "aws_secretsmanager_secret" "slack_bot_token" {
+  name = "slack-bot-token"
 }
 
-data "aws_secretsmanager_secret_version" "slack_webhook" {
-  secret_id = data.aws_secretsmanager_secret.slack_webhook.id
+data "aws_secretsmanager_secret_version" "slack_bot_token" {
+  secret_id = data.aws_secretsmanager_secret.slack_bot_token.id
 }
 
 resource "aws_ssm_parameter" "jira_api_token" {
@@ -355,7 +355,7 @@ module "iam_notifier" {
               "secretsmanager:GetSecretValue"
             ]
             Resource = [
-              data.aws_secretsmanager_secret.slack_webhook.arn
+              data.aws_secretsmanager_secret.slack_bot_token.arn
             ]
           },
           {
@@ -456,9 +456,10 @@ module "lambda_slack_notifier" {
   timeout     = var.notifier_timeout
 
   environment_variables = {
-    ENVIRONMENT           = var.environment
-    ALERTS_TABLE          = module.dynamodb_alerts.table_name
-    SLACK_WEBHOOK_SECRET  = data.aws_secretsmanager_secret.slack_webhook.name
+    ENVIRONMENT            = var.environment
+    ALERTS_TABLE           = module.dynamodb_alerts.table_name
+    SLACK_BOT_TOKEN_SECRET = data.aws_secretsmanager_secret.slack_bot_token.name
+    SLACK_CHANNEL          = var.slack_channel
   }
 
   tags = local.common_tags

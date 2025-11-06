@@ -51,8 +51,14 @@ variable "google_api_key" {
   default     = ""
 }
 
-# Slack webhook is now stored in AWS Secrets Manager (saar-katz-slack-webhook)
-# No variable needed - Terraform references the existing secret
+# Slack bot token is now stored in AWS Secrets Manager (slack-bot-token)
+# No variable needed for token - Terraform references the existing secret
+
+variable "slack_channel" {
+  description = "Slack channel to send alerts to (e.g., #alerts or C01234ABCD)"
+  type        = string
+  default     = "#alerts"
+}
 
 variable "jira_enabled" {
   description = "Enable Jira integration"

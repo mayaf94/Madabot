@@ -104,9 +104,9 @@ output "ai_api_key_parameter" {
   value       = var.ai_provider == "anthropic" ? aws_ssm_parameter.anthropic_api_key[0].name : aws_ssm_parameter.google_api_key[0].name
 }
 
-output "slack_webhook_secret_name" {
-  description = "Secrets Manager secret name for Slack webhook URL"
-  value       = data.aws_secretsmanager_secret.slack_webhook.name
+output "slack_bot_token_secret_name" {
+  description = "Secrets Manager secret name for Slack bot token"
+  value       = data.aws_secretsmanager_secret.slack_bot_token.name
 }
 
 # IAM Role Outputs
