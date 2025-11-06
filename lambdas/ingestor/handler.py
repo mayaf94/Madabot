@@ -82,7 +82,7 @@ def lambda_handler(event, context):
             'severity': detail.get('severity', 'HIGH'),
             'source': 'eventbridge',
             'log_group': detail.get('log_group', '/aws/test-app'),
-            'log_stream': detail.get('log_stream', 'eventbridge-stream'),
+                        'log_stream': detail.get('log_stream', 'test-stream'),
             'timestamp': int(datetime.utcnow().timestamp() * 1000)
         }
 

@@ -47,7 +47,7 @@ class CodeFetcher:
         except self.s3_client.exceptions.NoSuchKey:
             print("⚠️ code-mapping.json not found in S3, using default mapping")
             self.code_mapping = {
-                '/aws/test-app': 'test/test_app.py'
+                '/aws/test-app': 'test_app.py'
             }
         except Exception as e:
             print(f"❌ Error loading code mapping from S3: {e}")
