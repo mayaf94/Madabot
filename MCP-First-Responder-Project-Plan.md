@@ -181,15 +181,15 @@
 ### **Phase 2: Intelligence & Context (Day 2)** - Enhanced Analysis
 
 #### Context Gathering (4 hours)
-- [ ] **Infrastructure Context**
-  - [ ] Implement EC2 instance status check
+- [ !!!!] **Infrastructure Context**
+  - [ ] Implement EC2 instance status check - ניתוח הבעיה עוד לפני פתיחת הטיקט
   - [ ] Add ECS/Fargate task health check
   - [ ] Get ALB/Target group health
   - [ ] Fetch recent CloudFormation/deployment changes
   - [ ] Query CloudWatch metrics (CPU, memory, errors)
   - [ ] Add service tagging strategy
 
-- [ ] **Code Context**
+- [ !!!!] **Code Context**
   - [ ] Set up S3 bucket for code storage
   - [ ] Implement stack trace parser
   - [ ] Fetch relevant code snippets from S3
