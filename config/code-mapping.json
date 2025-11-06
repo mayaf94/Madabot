@@ -1,0 +1,13 @@
+{
+  "_comment": "Code Mapping Configuration - Maps log groups to code files in S3",
+  "_usage": "This file is uploaded to S3 at config/code-mapping.json and used by the analyzer Lambda",
+
+  "/aws/test-app": "test/test_app.py",
+
+  "_examples": {
+    "_comment": "Add your application log groups below",
+    "/aws/lambda/my-api": "src/api/handler.py",
+    "/ecs/my-service": "services/my-service/main.py",
+    "/aws/lambda/user-service": "lambdas/user-service/handler.py"
+  }
+}

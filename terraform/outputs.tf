@@ -209,3 +209,14 @@ output "jira_queue_url" {
   description = "Jira processing queue URL (if Jira is enabled)"
   value       = var.jira_enabled ? module.sqs_jira[0].queue_url : "Jira not enabled"
 }
+
+# S3 Bucket Outputs
+output "code_storage_bucket_name" {
+  description = "Name of the S3 bucket for code storage"
+  value       = aws_s3_bucket.code_storage.id
+}
+
+output "code_storage_bucket_arn" {
+  description = "ARN of the S3 bucket for code storage"
+  value       = aws_s3_bucket.code_storage.arn
+}

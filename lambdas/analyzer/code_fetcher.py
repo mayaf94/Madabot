@@ -1,32 +1,59 @@
 """
-Code Context Fetcher - Simple POC Implementation
+Code Context Fetcher - S3-Based Implementation
 
-Fetches relevant code from the local filesystem to provide context for AI analysis.
-This POC version reads from packaged files within the Lambda deployment.
+Fetches relevant code from S3 to provide context for AI analysis.
+Reads code files stored in S3 bucket and provides relevant snippets for alerts.
 """
 
 import os
 import re
+import boto3
+import json
 from typing import Dict, List, Optional, Any
 
 
 class CodeFetcher:
-    """Fetches code context for alerts"""
+    """Fetches code context for alerts from S3"""
 
-    # Simple mapping of log groups to code files
-    # In POC, we package test_app.py with the Lambda
-    LOG_GROUP_TO_FILE = {
-        '/aws/test-app': 'test/test_app.py'
-    }
-
-    def __init__(self, lambda_root: str = '/var/task'):
+    def __init__(self, bucket_name: Optional[str] = None):
         """
         Initialize code fetcher
 
         Args:
-            lambda_root: Root directory of Lambda function (default: /var/task)
+            bucket_name: S3 bucket name for code storage (defaults to env var CODE_BUCKET)
         """
-        self.lambda_root = lambda_root
+        self.bucket_name = bucket_name or os.environ.get('CODE_BUCKET', '')
+        self.s3_client = boto3.client('s3') if self.bucket_name else None
+
+        # Code mapping will be loaded from S3
+        self.code_mapping = {}
+        if self.bucket_name:
+            self._load_code_mapping()
+
+    def _load_code_mapping(self):
+        """
+        Load code mapping configuration from S3
+
+        Reads code-mapping.json from S3 bucket which maps log groups to code files.
+        Falls back to default mapping if file doesn't exist.
+        """
+        try:
+            response = self.s3_client.get_object(
+                Bucket=self.bucket_name,
+                Key='config/code-mapping.json'
+            )
+            self.code_mapping = json.loads(response['Body'].read().decode('utf-8'))
+            print(f"✅ Loaded code mapping from S3: {len(self.code_mapping)} entries")
+        except self.s3_client.exceptions.NoSuchKey:
+            print("⚠️ code-mapping.json not found in S3, using default mapping")
+            self.code_mapping = {
+                '/aws/test-app': 'test/test_app.py'
+            }
+        except Exception as e:
+            print(f"❌ Error loading code mapping from S3: {e}")
+            self.code_mapping = {
+                '/aws/test-app': 'test/test_app.py'
+            }
 
     def extract_line_numbers_from_stacktrace(self, message: str) -> List[int]:
         """
@@ -46,29 +73,33 @@ class CodeFetcher:
 
     def read_file_content(self, file_path: str) -> Optional[str]:
         """
-        Read file content from Lambda filesystem
+        Read file content from S3
 
         Args:
-            file_path: Relative path to file (e.g., 'test/test_app.py')
+            file_path: S3 key for the file (e.g., 'test/test_app.py')
 
         Returns:
             File content as string, or None if file not found
         """
+        if not self.s3_client or not self.bucket_name:
+            print("❌ S3 client not initialized - CODE_BUCKET not configured")
+            return None
+
         try:
-            full_path = os.path.join(self.lambda_root, file_path)
+            response = self.s3_client.get_object(
+                Bucket=self.bucket_name,
+                Key=file_path
+            )
 
-            if not os.path.exists(full_path):
-                print(f"⚠️ Code file not found: {full_path}")
-                return None
-
-            with open(full_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-
-            print(f"✅ Read code file: {file_path} ({len(content)} chars)")
+            content = response['Body'].read().decode('utf-8')
+            print(f"✅ Read code file from S3: {file_path} ({len(content)} chars)")
             return content
 
+        except self.s3_client.exceptions.NoSuchKey:
+            print(f"⚠️ Code file not found in S3: {file_path}")
+            return None
         except Exception as e:
-            print(f"❌ Error reading code file {file_path}: {e}")
+            print(f"❌ Error reading code file from S3 {file_path}: {e}")
             return None
 
     def get_code_snippet(self, content: str, line_number: Optional[int] = None, context_lines: int = 10) -> str:
@@ -120,7 +151,7 @@ class CodeFetcher:
         message = alert.get('message', '')
 
         # Check if we have a mapping for this log group
-        file_path = self.LOG_GROUP_TO_FILE.get(log_group)
+        file_path = self.code_mapping.get(log_group)
 
         if not file_path:
             print(f"ℹ️ No code mapping for log group: {log_group}")
