@@ -3,6 +3,7 @@ import os
 import boto3
 import gzip
 import base64
+from datetime import datetime
 
 sqs = boto3.client('sqs')
 
@@ -74,11 +75,15 @@ def lambda_handler(event, context):
 
     # Handle EventBridge events (legacy support)
     elif 'detail' in event:
+        detail = event.get('detail', {})
         message = {
             'alert_id': context.aws_request_id,
-            'message': event.get('detail', {}).get('message', 'Test alert'),
-            'severity': 'HIGH',
-            'source': 'eventbridge'
+            'message': detail.get('message', 'Test alert'),
+            'severity': detail.get('severity', 'HIGH'),
+            'source': 'eventbridge',
+            'log_group': detail.get('log_group', '/aws/test-app'),
+            'log_stream': detail.get('log_stream', 'eventbridge-stream'),
+            'timestamp': int(datetime.utcnow().timestamp() * 1000)
         }
 
         sqs.send_message(
@@ -95,8 +100,11 @@ def lambda_handler(event, context):
         message = {
             'alert_id': context.aws_request_id,
             'message': event.get('message', 'Manual test alert'),
-            'severity': 'HIGH',
-            'source': 'manual'
+            'severity': event.get('severity', 'HIGH'),
+            'source': event.get('source', 'manual'),
+            'log_group': event.get('log_group', '/aws/test-app'),  # Default to test app
+            'log_stream': event.get('log_stream', 'test-stream'),
+            'timestamp': int(datetime.utcnow().timestamp() * 1000)
         }
 
         sqs.send_message(
