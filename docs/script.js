@@ -36,6 +36,10 @@ const timelineItems = document.querySelectorAll('.timeline-item');
 let demoRunning = false;
 let currentStep = 0;
 
+// Lambda Function URL - Replace this with actual URL from terraform output after deployment
+// Run: terraform output ingestor_demo_url
+const LAMBDA_DEMO_URL = 'YOUR_LAMBDA_URL_HERE';
+
 function resetDemo() {
     timelineItems.forEach(item => {
         item.classList.remove('active');
@@ -46,40 +50,96 @@ function resetDemo() {
     triggerBtn.textContent = 'Trigger Demo Alert';
 }
 
-function runDemo() {
+async function runDemo() {
     if (demoRunning) return;
 
     demoRunning = true;
     triggerBtn.disabled = true;
-    triggerBtn.textContent = 'Demo Running...';
+    triggerBtn.textContent = 'Triggering Real Alert...';
 
     // Reset first
     resetDemo();
     demoRunning = true;
     triggerBtn.disabled = true;
-    triggerBtn.textContent = 'Demo Running...';
+    triggerBtn.textContent = 'Triggering Real Alert...';
 
-    // Activate steps sequentially
-    const delays = [0, 2000, 4000, 6500];
+    try {
+        // Check if Lambda URL is configured
+        if (LAMBDA_DEMO_URL === 'YOUR_LAMBDA_URL_HERE') {
+            console.warn('Lambda URL not configured - running animation only');
+            triggerBtn.textContent = 'Demo Running (Simulated)...';
+        } else {
+            // Actually trigger the Lambda function
+            console.log('Triggering Lambda function:', LAMBDA_DEMO_URL);
 
-    timelineItems.forEach((item, index) => {
-        setTimeout(() => {
-            item.classList.add('active');
-            currentStep = index + 1;
+            const response = await fetch(LAMBDA_DEMO_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: 'Demo Alert: Database connection timeout after 30 seconds',
+                    severity: 'HIGH',
+                    source: 'demo-web-page',
+                    log_group: '/aws/lambda/demo-app',
+                    log_stream: 'demo-stream'
+                })
+            });
 
-            // Add some visual feedback
-            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-            // When demo completes
-            if (index === timelineItems.length - 1) {
-                setTimeout(() => {
-                    demoRunning = false;
-                    triggerBtn.disabled = false;
-                    triggerBtn.textContent = 'Trigger Demo Alert';
-                }, 1000);
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ Alert triggered successfully:', result);
+                triggerBtn.textContent = '✅ Real Alert Sent!';
+            } else {
+                console.error('❌ Failed to trigger alert:', response.status);
+                triggerBtn.textContent = '❌ Failed - Running Simulation';
             }
-        }, delays[index]);
-    });
+        }
+
+        // Activate steps sequentially to show the process
+        const delays = [500, 2500, 5000, 7500];
+
+        timelineItems.forEach((item, index) => {
+            setTimeout(() => {
+                item.classList.add('active');
+                currentStep = index + 1;
+
+                // Add some visual feedback
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // When demo completes
+                if (index === timelineItems.length - 1) {
+                    setTimeout(() => {
+                        demoRunning = false;
+                        triggerBtn.disabled = false;
+                        triggerBtn.textContent = 'Trigger Demo Alert';
+                    }, 1000);
+                }
+            }, delays[index]);
+        });
+
+    } catch (error) {
+        console.error('Error triggering demo:', error);
+        triggerBtn.textContent = '❌ Error - See Console';
+
+        // Still run animation
+        const delays = [500, 2500, 5000, 7500];
+        timelineItems.forEach((item, index) => {
+            setTimeout(() => {
+                item.classList.add('active');
+                currentStep = index + 1;
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                if (index === timelineItems.length - 1) {
+                    setTimeout(() => {
+                        demoRunning = false;
+                        triggerBtn.disabled = false;
+                        triggerBtn.textContent = 'Trigger Demo Alert';
+                    }, 1000);
+                }
+            }, delays[index]);
+        });
+    }
 }
 
 triggerBtn.addEventListener('click', runDemo);

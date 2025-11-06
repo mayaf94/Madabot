@@ -443,6 +443,21 @@ module "lambda_ingestor" {
   tags = local.common_tags
 }
 
+# Lambda Function URL for demo/testing - allows direct invocation from web page
+resource "aws_lambda_function_url" "ingestor_demo" {
+  function_name      = module.lambda_ingestor.function_name
+  authorization_type = "NONE" # Public access for demo
+
+  cors {
+    allow_origins     = ["*"]
+    allow_methods     = ["POST", "OPTIONS"]
+    allow_headers     = ["content-type", "x-amz-date", "authorization", "x-api-key"]
+    expose_headers    = ["x-amz-request-id"]
+    max_age           = 86400
+    allow_credentials = false
+  }
+}
+
 module "lambda_analyzer" {
   source = "./modules/lambda"
 

@@ -33,13 +33,13 @@
     <section class="hero">
         <div class="container">
             <div class="hero-content">
-                <div class="hero-badge">Powered by Claude AI</div>
+                <div class="hero-badge">Powered by Claude AI & Google Gemini</div>
                 <h1 class="hero-title">
                     Intelligent Incident Response
                     <span class="gradient-text">Powered by AI</span>
                 </h1>
                 <p class="hero-subtitle">
-                    Transform CloudWatch alerts into actionable insights. Automatically analyze, diagnose, and distribute incident reports to Slack, Jira, and email with AI-powered root cause analysis.
+                    Transform CloudWatch alerts into actionable insights with infrastructure context. Automatically analyze Pod health, ECS tasks, EC2 instances, and deployment changes to deliver AI-powered root cause analysis to Slack and Jira.
                 </p>
                 <div class="hero-cta">
                     <a href="#demo" class="btn-primary">See It In Action</a>
@@ -92,12 +92,12 @@
                 <div class="feature-card">
                     <img src="static/brain.png" alt="AI-Powered Analysis" class="feature-icon">
                     <h3>AI-Powered Analysis</h3>
-                    <p>Claude AI analyzes logs, traces, and infrastructure state to determine root cause and impact within seconds.</p>
+                    <p>Claude AI or Google Gemini analyzes logs, traces, and infrastructure state to determine root cause and impact within seconds.</p>
                 </div>
                 <div class="feature-card">
                     <img src="static/context.png" alt="Context-Aware" class="feature-icon">
-                    <h3>Context-Aware</h3>
-                    <p>Automatically gathers CloudWatch logs, deployment history, infrastructure health, and historical patterns.</p>
+                    <h3>Infrastructure Context</h3>
+                    <p>Auto-detects ECS tasks, EC2 instances, K8s Pods. Checks ALB target health, CloudFormation deployments, CPU/memory metrics, and recent logs.</p>
                 </div>
                 <div class="feature-card">
                     <img src="static/dollar.png" alt="Cost Optimized" class="feature-icon">
@@ -112,7 +112,7 @@
                 <div class="feature-card">
                     <img src="static/notification.png" alt="Multi-Channel Distribution" class="feature-icon">
                     <h3>Multi-Channel Distribution</h3>
-                    <p>Rich Slack notifications with Block Kit, automatic Jira tickets, and formatted email alerts.</p>
+                    <p>Rich Slack notifications with Block Kit formatting and interactive buttons. Optional automatic Jira ticket creation.</p>
                 </div>
                 <div class="feature-card">
                     <img src="static/shield.png" alt="Production Ready" class="feature-icon">
@@ -147,11 +147,12 @@
                     <div class="stage-number">2</div>
                     <div class="stage-content">
                         <h3>Analyze & Diagnose</h3>
-                        <p>Gathers comprehensive context and sends to Claude AI for root cause analysis, severity assessment, and remediation recommendations.</p>
+                        <p>Gathers infrastructure context: EC2/ECS health, ALB targets, CloudFormation changes, CloudWatch metrics, recent logs. Sends enriched data to Claude/Gemini for intelligent root cause analysis.</p>
                         <div class="stage-tech">
-                            <span class="tech-badge">Claude AI</span>
-                            <span class="tech-badge">DynamoDB</span>
+                            <span class="tech-badge">Claude/Gemini</span>
+                            <span class="tech-badge">EC2/ECS/ALB</span>
                             <span class="tech-badge">CloudWatch</span>
+                            <span class="tech-badge">DynamoDB</span>
                         </div>
                     </div>
                 </div>
@@ -159,11 +160,10 @@
                     <div class="stage-number">3</div>
                     <div class="stage-content">
                         <h3>Distribute & Act</h3>
-                        <p>Sends formatted notifications to Slack with interactive buttons, creates Jira tickets, and emails stakeholders.</p>
+                        <p>Sends formatted notifications to Slack with interactive buttons (Acknowledge, Create Jira). Deep links to CloudWatch logs included.</p>
                         <div class="stage-tech">
                             <span class="tech-badge">Slack API</span>
-                            <span class="tech-badge">Jira API</span>
-                            <span class="tech-badge">SES</span>
+                            <span class="tech-badge">Jira API (optional)</span>
                         </div>
                     </div>
                 </div>
@@ -198,10 +198,11 @@
                 </div>
                 <div class="arch-arrow-down">↓</div>
                 <div class="arch-layer">
-                    <div class="arch-label">Analysis</div>
+                    <div class="arch-label">Analysis + Context</div>
                     <div class="arch-components">
+                        <div class="arch-box ai-highlight">Context Gatherer</div>
                         <div class="arch-box ai-highlight">Analyzer Lambda</div>
-                        <div class="arch-box ai-highlight">Claude API</div>
+                        <div class="arch-box ai-highlight">Claude/Gemini API</div>
                         <div class="arch-box ai-highlight">DynamoDB Cache</div>
                     </div>
                 </div>
@@ -210,8 +211,8 @@
                     <div class="arch-label">Distribution</div>
                     <div class="arch-components">
                         <div class="arch-box">Slack Notifier</div>
-                        <div class="arch-box">Jira Notifier</div>
-                        <div class="arch-box">Email Notifier</div>
+                        <div class="arch-box">Jira Notifier (optional)</div>
+                        <div class="arch-box">Slack Interactions</div>
                     </div>
                 </div>
             </div>
@@ -244,18 +245,26 @@
                     <div class="timeline-item" data-step="2">
                         <div class="timeline-marker"></div>
                         <div class="timeline-content">
-                            <h4>Context Gathering</h4>
-                            <p>Fetching logs, infrastructure state, and deployment history</p>
+                            <h4>Infrastructure Context Gathering</h4>
+                            <p>Auto-detected ECS Task abc123 on production-cluster</p>
+                            <div class="timeline-code">
+                                ✓ ECS Task Health: RUNNING (Container exit code: 137 - OOM killed)<br>
+                                ✓ ALB Targets: 0/3 healthy<br>
+                                ✓ CloudFormation: Stack updated 2h ago (security group changed)<br>
+                                ✓ Metrics: CPU 95%, Memory 87%<br>
+                                ✓ Recent Logs: 50 entries analyzed
+                            </div>
                         </div>
                     </div>
                     <div class="timeline-item" data-step="3">
                         <div class="timeline-marker"></div>
                         <div class="timeline-content">
-                            <h4>AI Analysis</h4>
-                            <p>Claude identifies root cause and recommends actions</p>
+                            <h4>AI Analysis with Context</h4>
+                            <p>Claude/Gemini analyzes with full infrastructure context</p>
                             <div class="analysis-result">
-                                <strong>Root Cause:</strong> Recent deployment increased connection pool usage. RDS instance at max connections (100/100).<br>
-                                <strong>Recommended Action:</strong> Scale RDS instance or optimize connection pooling.
+                                <strong>Root Cause:</strong> Recent CloudFormation deployment changed DB security group, blocking ECS tasks from connecting. High CPU is due to connection retry storm.<br>
+                                <strong>Impact:</strong> All 3 backend tasks cannot reach database - total service outage<br>
+                                <strong>Recommended Action:</strong> Rollback CloudFormation stack "production-db" or fix security group sg-abc123 to allow traffic from ECS task security group.
                             </div>
                         </div>
                     </div>
@@ -263,7 +272,7 @@
                         <div class="timeline-marker"></div>
                         <div class="timeline-content">
                             <h4>Notifications Sent</h4>
-                            <p>Slack message delivered, Jira ticket created, emails sent</p>
+                            <p>Slack message with Block Kit formatting delivered in 45 seconds</p>
                             <div class="notification-preview">
                                 <div class="slack-preview">
                                     <strong>🚨 CRITICAL: Database Connection Timeout</strong><br>
