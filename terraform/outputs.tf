@@ -9,11 +9,6 @@ output "ingestor_function_arn" {
   value       = module.lambda_ingestor.function_arn
 }
 
-output "ingestor_demo_url" {
-  description = "Public Lambda Function URL for demo/testing (use this in the web page)"
-  value       = aws_lambda_function_url.ingestor_demo.function_url
-}
-
 output "analyzer_function_name" {
   description = "Name of the analyzer Lambda function"
   value       = module.lambda_analyzer.function_name
