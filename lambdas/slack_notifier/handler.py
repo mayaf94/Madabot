@@ -27,6 +27,103 @@ def get_severity_emoji(severity):
     }
     return severity_emojis.get(severity, '⚪')
 
+def extract_analysis_summary(analysis):
+    """Extract a concise summary from the full AI analysis"""
+    # Try to extract key sections from the analysis
+    lines = analysis.split('\n')
+    summary_parts = []
+
+    # Look for key sections
+    in_severity = False
+    in_root_cause = False
+    in_impact = False
+    in_actions = False
+
+    severity_lines = []
+    root_cause_lines = []
+    impact_lines = []
+    action_lines = []
+
+    for line in lines:
+        line_lower = line.lower().strip()
+
+        # Detect section headers
+        if 'severity' in line_lower and ('assessment' in line_lower or ':' in line):
+            in_severity = True
+            in_root_cause = False
+            in_impact = False
+            in_actions = False
+            continue
+        elif 'root cause' in line_lower or 'most likely' in line_lower:
+            in_severity = False
+            in_root_cause = True
+            in_impact = False
+            in_actions = False
+            continue
+        elif 'impact' in line_lower and ('assessment' in line_lower or ':' in line):
+            in_severity = False
+            in_root_cause = False
+            in_impact = True
+            in_actions = False
+            continue
+        elif 'recommend' in line_lower or 'action' in line_lower or 'remediation' in line_lower:
+            in_severity = False
+            in_root_cause = False
+            in_impact = False
+            in_actions = True
+            continue
+        elif line.startswith('##') or line.startswith('---'):
+            # Section break
+            in_severity = False
+            in_root_cause = False
+            in_impact = False
+            in_actions = False
+            continue
+
+        # Collect relevant lines
+        if in_root_cause and line.strip() and not line.startswith('#'):
+            root_cause_lines.append(line.strip())
+            if len(root_cause_lines) >= 3:
+                in_root_cause = False
+        elif in_impact and line.strip() and not line.startswith('#'):
+            impact_lines.append(line.strip())
+            if len(impact_lines) >= 2:
+                in_impact = False
+        elif in_actions and line.strip() and not line.startswith('#'):
+            if line.strip().startswith(('•', '-', '*', '1', '2', '3')):
+                action_lines.append(line.strip())
+                if len(action_lines) >= 3:
+                    in_actions = False
+
+    # Build concise summary
+    if root_cause_lines:
+        # Take first substantive sentence
+        for line in root_cause_lines[:3]:
+            if len(line) > 30 and not line.startswith('**'):
+                summary_parts.append(f"*Root Cause:* {line[:200]}")
+                break
+
+    if impact_lines:
+        for line in impact_lines[:2]:
+            if len(line) > 20 and not line.startswith('**'):
+                summary_parts.append(f"*Impact:* {line[:150]}")
+                break
+
+    if action_lines:
+        actions = []
+        for line in action_lines[:3]:
+            cleaned = line.lstrip('•-*123456789. ')
+            if len(cleaned) > 10:
+                actions.append(f"• {cleaned[:100]}")
+        if actions:
+            summary_parts.append(f"*Actions:*\n" + '\n'.join(actions))
+
+    if summary_parts:
+        return '\n\n'.join(summary_parts)
+    else:
+        # Fallback: take first 500 chars
+        return analysis[:500] + "..."
+
 def build_slack_blocks(body):
     """Build Slack Block Kit message"""
     severity = body.get('severity', 'UNKNOWN')
@@ -122,12 +219,13 @@ def build_slack_blocks(body):
     # Add divider
     blocks.append({"type": "divider"})
 
-    # Add AI analysis
+    # Add AI analysis summary
+    analysis_summary = extract_analysis_summary(analysis)
     blocks.append({
         "type": "section",
         "text": {
             "type": "mrkdwn",
-            "text": f"*🤖 AI Analysis:*\n{analysis[:2800]}"  # Slack has 3000 char limit per block
+            "text": f"*🤖 AI Analysis Summary:*\n{analysis_summary}\n\n_💡 Full analysis available in Jira ticket_"
         }
     })
 
